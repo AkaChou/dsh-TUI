@@ -1523,6 +1523,17 @@ export function Chat({
     btw !== null ||
     traceOpen
 
+  // 浮层整体挂载条件：必须与内部各面板的可见条件精确同值。关闭时把
+  // 整个 absolute 浮层从树里移除——渲染器的"移除 absolute 节点"检测只看
+  // 被移除子树自身的 style.position（dom.ts collectRemovedRects），若浮层
+  // 常驻、只移除其普通子节点，blit 解毒不触发，被覆盖的转录行会在
+  // blit-skip 后留空（Esc 关 picker 一片空白的根因）。
+  const dialogOverlayOpen =
+    thinkingOpen || (resumePickerOpen && resumeSessions.length > 0) || modelPickerOpen ||
+    activityPickerOpen || (effortSliderOpen && effortOptions.length > 1) ||
+    (presetPickerOpen && presetOptions.length > 0) || themePickerOpen || historyOpen ||
+    rewindOpen || traceOpen || searchOpen
+
   return (
     <Box flexDirection="column" flexGrow={1} width="100%">
       {!isSticky && channel.lastUserText && (
@@ -1667,7 +1678,8 @@ export function Chat({
             覆盖转录尾部行，自身零布局高度。in-flow 挂载会让帧高随面板开关涨落，
             把帧顶行滚进 scrollback 并在关闭重绘时二次写入（每切一次 /model 多
             一份启动画的根因）。maxHeight 预留 prompt/statusline 行，防短会话
-            高列表探出帧顶。 */}
+            高列表探出帧顶。整体条件挂载：见 dialogOverlayOpen 注释。 */}
+        {dialogOverlayOpen && (
         <OverlayAbove maxHeight={Math.max(terminalRows - 8, 8)}>
           {thinkingOpen && (
             <ThinkingToggle
@@ -1761,6 +1773,7 @@ export function Chat({
           )}
           {searchOpen && <TranscriptSearchBar query={searchQuery} cursorOffset={searchCursor} count={searchCount} current={searchCurrent} />}
         </OverlayAbove>
+        )}
       </Box>
     </Box>
   )

@@ -15,6 +15,15 @@ process.env.TERM_PROGRAM = 'WezTerm'  // DEC-2026 同步输出路径
 process.env.CC_TUI_THEME = 'dark'     // 跳过 OSC 11 探测，保持确定性
 process.env.CC_TUI_LANG = 'zh'        // 固定中文 UI（splash 标语断言）
 
+// 隔离 HOME：switchModel 会把 picker 选择写进 ~/.dsh-cc/model.json
+// （modelPrefs.PREFS_DIR 在模块加载时按 homedir() 解析），不隔离会把
+// fake-provider 写进真机配置——真机下一次启动所有回合报
+// "no adapter registered for provider fake-provider"。必须在 import src 之前。
+const { mkdtempSync } = await import('node:fs')
+const { tmpdir } = await import('node:os')
+const { join: joinPath } = await import('node:path')
+process.env.HOME = mkdtempSync(joinPath(tmpdir(), 'dsh-cc-repro-home-'))
+
 const [{ PassThrough, Writable }, React, { Terminal: XTerm }, { render }, { Chat }, { QuestionStore }, { createChannel }] = await Promise.all([
   import('node:stream'),
   import('react'),

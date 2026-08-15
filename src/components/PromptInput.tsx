@@ -826,11 +826,18 @@ export function PromptInput({
     active: !selectionActive,
   })
 
+  // 浮层整体挂载条件：与内部面板可见条件精确同值。关闭时必须把整个
+  // absolute 浮层移除——渲染器的 absolute-removed 检测只看被移除节点自身
+  // 的 style.position，常驻浮层 + 移除普通子节点不会触发 blit 解毒，被
+  // 覆盖的转录行会留空（见 Chat.tsx dialogOverlayOpen 注释）。
+  const floatersOpen = helpOpen || channel.pending.length > 0 || fileOverlayOpen || overlayOpen
+
   return (
     <Box flexDirection="column" marginTop={1}>
       {/* 瞬态面板浮层（帮助/队列/补全）：零布局高度、向上覆盖转录尾部，
           帧高不随面板开关涨落——否则帧顶行会被滚进 scrollback 并在关闭
           重绘时二次写入（/model 切换多一份启动画的根因，见 OverlayAbove）。 */}
+      {floatersOpen && (
       <OverlayAbove maxHeight={Math.max(terminalRows - 6, 4)}>
         {helpOpen && (
           <Box marginBottom={1}>
@@ -885,6 +892,7 @@ export function PromptInput({
           </Box>
         )}
       </OverlayAbove>
+      )}
       {lastNotification && (
         // position=absolute takes zero layout height so the transcript never
         // shifts when a notification appears/disappears; the layer floats one
