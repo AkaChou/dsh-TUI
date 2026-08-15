@@ -34,7 +34,12 @@ export function OverlayAbove({
       opaque
       {...(maxHeight === undefined ? {} : { maxHeight })}
     >
-      {children}
+      {/* flexShrink={0}：内容超高时让 overflow 从顶部裁整行，而不是被 yoga
+          把某个中间行挤成零高（挤压态的零高行会被渲染器跳过，列表中间凭
+          空少一行且下方整体上移——30 模型实测焦点行消失）。 */}
+      <Box flexDirection="column" flexShrink={0}>
+        {children}
+      </Box>
     </Box>
   )
 }

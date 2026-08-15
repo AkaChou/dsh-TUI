@@ -223,9 +223,40 @@ stdin.write('\r')
 await sleep(1500)
 check('二次切换后 splash 恰好一份', countMarker(SPLASH) === 1, `实际 ${countMarker(SPLASH)}`)
 
+// ---- Esc 只关不切换：浮层整体条件挂载的回归场景 -----------------------------
+// 关键前置：等 splash 动画彻底稳定（不再有新帧）。动画每 tick 会把 ScrollBox
+// 标脏、强制全量重绘，掩盖"关闭浮层后被覆盖行留空"的缺陷（条件挂载缺失时，
+// 干净 ScrollBox 的 blit 会跳过 absoluteClear 覆盖行——真实终端上动画停止
+// 后这些行永久空白）。覆盖区内的历史尾行没有动画治疗，是最敏感的探针。
+const waitQuiet = async () => {
+  const deadline = Date.now() + 20_000
+  let last = rawChunks.length
+  while (Date.now() < deadline) {
+    await sleep(600)
+    if (rawChunks.length === last) return
+    last = rawChunks.length
+  }
+  console.log('  [warn] 动画 20s 未稳定，继续执行（历史行断言不受影响）')
+}
+await waitQuiet()
+const modelBeforeEsc = channel.model
+const bufBeforeEsc = term.buffer.active.length
+await typeKeys('/model')
+await sleep(200)
+stdin.write('\r')            // 打开 picker
+await sleep(600)
+stdin.write('\x1b')          // Esc：只关闭，不切换
+await sleep(600)
+check('Esc 不改动模型', channel.model === modelBeforeEsc, `实际 ${channel.model}`)
+check('Esc 关闭后被覆盖历史行仍在',
+  countMarker('第 1-8 条历史回答要点') === 1 && countMarker('第 1-11 条历史回答要点') === 1,
+  `1-8=${countMarker('第 1-8 条历史回答要点')} 1-11=${countMarker('第 1-11 条历史回答要点')}`)
+check('Esc 开关周期缓冲区零增长', term.buffer.active.length === bufBeforeEsc,
+  `${bufBeforeEsc} → ${term.buffer.active.length}`)
+
 console.log(`final: buffer=${term.buffer.active.length} 行 (视口 ${ROWS}, scrollback ${term.buffer.active.length - ROWS})`)
 const fullResets = rawChunks.join('').match(/\x1b\[10000S/g)?.length ?? 0
-console.log(`full-reset (CSI 10000S) 次数: ${fullResets}`)
+check('全程无 full-reset (CSI 10000S)', fullResets === 0, `实际 ${fullResets}`)
 
 if (process.env.DUMP === '1') {
   const buf = term.buffer.active

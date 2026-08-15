@@ -1,10 +1,11 @@
 import React from 'react'
-import { Box, Text } from '../ui.js'
+import { Box, Text, useTerminalSize } from '../ui.js'
 import type { ChatRow } from '../channel.js'
 import { Pane } from './design-system/Pane.js'
 import { ListItem } from './design-system/ListItem.js'
 import { Byline } from './design-system/Byline.js'
 import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js'
+import { listWindow } from './listWindow.js'
 
 /**
  * Double-Esc rewind picker (CC's "Double-tap esc to rewind the code and/or
@@ -44,6 +45,11 @@ export function RewindPicker({
     )
   }
 
+  const { rows: terminalRows } = useTerminalSize()
+  // 焦点窗口化（Select 同款）：浮层 maxHeight 裁剪下全量渲染会藏掉焦点行，
+  // rewind 是不可见确认的高危操作，焦点必须始终在屏。
+  // 框架行：浮层预留 8 + 标题块/页脚/边距约 5。
+  const { start, end } = listWindow(rows.length, focusIndex, Math.max(terminalRows - 13, 4))
   return (
     <Pane color="permission">
       <Box flexDirection="column">
@@ -56,15 +62,20 @@ export function RewindPicker({
         {rows.length === 0 ? (
           <ListItem isFocused={false}>No messages to rewind to</ListItem>
         ) : (
-          rows.map((row, index) => (
-            <ListItem
-              key={row.id}
-              isFocused={index === focusIndex}
-              description={index === 0 ? 'last message' : undefined}
-            >
-              {preview(row.text)}
-            </ListItem>
-          ))
+          rows.slice(start, end).map((row, index) => {
+            const absoluteIndex = start + index
+            return (
+              <ListItem
+                key={row.id}
+                isFocused={absoluteIndex === focusIndex}
+                description={absoluteIndex === 0 ? 'last message' : undefined}
+                showScrollUp={absoluteIndex === start && start > 0}
+                showScrollDown={absoluteIndex === end - 1 && end < rows.length}
+              >
+                {preview(row.text)}
+              </ListItem>
+            )
+          })
         )}
       </Box>
       <Text dimColor italic>

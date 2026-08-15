@@ -1,11 +1,12 @@
 import React from 'react'
-import { Box, Text } from '../ui.js'
+import { Box, Text, useTerminalSize } from '../ui.js'
 import { useTerminalFocus } from '../ink/hooks/use-terminal-focus.js'
 import { Pane } from './design-system/Pane.js'
 import { ListItem } from './design-system/ListItem.js'
 import { Byline } from './design-system/Byline.js'
 import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js'
 import { SearchBox } from './SearchBox.js'
+import { listWindow } from './listWindow.js'
 import { historyEntryId, type HistoryEntry } from '../history.js'
 
 /**
@@ -27,6 +28,10 @@ export function HistorySearchDialog({
   focusIndex: number
 }): React.ReactNode {
   const isTerminalFocused = useTerminalFocus()
+  const { rows: terminalRows } = useTerminalSize()
+  // 焦点窗口化（Select 同款）：浮层 maxHeight 裁剪下全量渲染会藏掉焦点行。
+  // 框架行：浮层预留 8 + 标题/搜索框/页脚/gap 约 8。
+  const { start, end } = listWindow(matches.length, focusIndex, Math.max(terminalRows - 16, 3))
   return (
     <Pane color="permission">
       <Box flexDirection="column" gap={1}>
@@ -43,15 +48,20 @@ export function HistorySearchDialog({
         {matches.length === 0 ? (
           <Text dimColor>No matching commands</Text>
         ) : (
-          matches.map((entry, index) => (
-            <ListItem
-              key={historyEntryId(entry)}
-              isFocused={index === focusIndex}
-              description={formatRelativeAge(entry.ts)}
-            >
-              {entry.text}
-            </ListItem>
-          ))
+          matches.slice(start, end).map((entry, index) => {
+            const absoluteIndex = start + index
+            return (
+              <ListItem
+                key={historyEntryId(entry)}
+                isFocused={absoluteIndex === focusIndex}
+                description={formatRelativeAge(entry.ts)}
+                showScrollUp={absoluteIndex === start && start > 0}
+                showScrollDown={absoluteIndex === end - 1 && end < matches.length}
+              >
+                {entry.text}
+              </ListItem>
+            )
+          })
         )}
         <Text dimColor italic>
           <Byline>
