@@ -1,6 +1,6 @@
 import React from 'react'
 import { t, getLang, setLang, isLang, writeLangPref, subscribeLang, type I18nKey } from '../i18n.js'
-import { Box, Text, useInput, ScrollBox, type ScrollBoxHandle, useTheme } from '../ui.js'
+import { Box, Text, useInput, ScrollBox, type ScrollBoxHandle, useTheme, useTerminalSize } from '../ui.js'
 import { POINTER } from '../cc/figures.js'
 import { isMod, modLabel } from '../utils/modifiers.js'
 import { formatTokens } from '../cc/format.js'
@@ -19,6 +19,7 @@ import { useSelection } from '../ink/hooks/use-selection.js'
 import { NoSelect } from '../ink/components/NoSelect.js'
 import instances from '../ink/instances.js'
 import { LogoHeader, MessageList } from '../components/MessageList.js'
+import { OverlayAbove } from '../components/OverlayAbove.js'
 import { PromptInput, type PromptController } from '../components/PromptInput.js'
 import { GoalTodoPanel } from '../components/GoalTodoPanel.js'
 import { LoadedContextPanel } from '../components/LoadedContextPanel.js'
@@ -211,6 +212,7 @@ export function Chat({
   const [themePickerOpen, setThemePickerOpen] = React.useState(false)
   const [themeIndex, setThemeIndex] = React.useState(0)
   const [themeName, setTheme] = useTheme()
+  const { rows: terminalRows } = useTerminalSize()
   const [showAllMessages, setShowAllMessages] = React.useState(false)
   const [thinkingVisible, setThinkingVisible] = React.useState(true)
   const [thinkingOpen, setThinkingOpen] = React.useState(false)
@@ -1612,97 +1614,6 @@ export function Chat({
                 thinkingStatus={thinkingStatus}
               />
             ))}
-        {thinkingOpen && (
-          <ThinkingToggle
-            currentValue={thinkingVisible}
-            focusIndex={thinkingFocus}
-            confirmationPending={thinkingConfirm}
-          />
-        )}
-        {resumePickerOpen && resumeSessions.length > 0 && (
-          <Box flexDirection="column" marginTop={1}>
-            <ResumePicker
-              sessions={resumeSessions}
-              focusIndex={resumeIndex}
-              currentSessionId={channel.agentId}
-              mode={resumeMode}
-              renameText={resumeRenameText}
-            />
-          </Box>
-        )}
-        {modelPickerOpen && (
-          <Box flexDirection="column" marginTop={1}>
-            {models.length === 0 ? (
-              <ModelPickerLoading />
-            ) : (
-              <ModelPicker
-                models={models}
-                focusIndex={modelIndex}
-                currentModel={`${channel.provider}/${channel.model}`}
-              />
-            )}
-          </Box>
-        )}
-        {activityPickerOpen && (
-          <Box flexDirection="column" marginTop={1}>
-            <ActivityPicker
-              focusIndex={activityIndex}
-              currentPreset={channel.activityFrames}
-            />
-          </Box>
-        )}
-        {effortSliderOpen && effortOptions.length > 1 && (
-          <Box flexDirection="column" marginTop={1}>
-            <EffortSlider
-              options={effortOptions}
-              focusIndex={effortIndex}
-              currentId={channel.reasoningEffort}
-            />
-          </Box>
-        )}
-        {presetPickerOpen && presetOptions.length > 0 && (
-          <Box flexDirection="column" marginTop={1}>
-            <PresetPicker
-              presets={presetOptions}
-              focusIndex={presetIndex}
-              currentPreset={channel.agentPreset}
-            />
-          </Box>
-        )}
-        {themePickerOpen && (
-          <Box flexDirection="column" marginTop={1}>
-            <ThemePicker focusIndex={themeIndex} currentTheme={themeName} />
-          </Box>
-        )}
-        {historyOpen && (
-          <Box flexDirection="column" marginTop={1}>
-            <HistorySearchDialog
-              query={historyQuery}
-              cursorOffset={historyCursor}
-              matches={historyMatches}
-              focusIndex={historyFocus}
-            />
-          </Box>
-        )}
-        {rewindOpen && (
-          <Box flexDirection="column" marginTop={1}>
-            <RewindPicker
-              rows={rewindRows}
-              focusIndex={rewindIndex}
-              confirmRow={rewindConfirm}
-            />
-          </Box>
-        )}
-        {traceOpen && (
-          <Box flexDirection="column" marginTop={1}>
-            <TraceView
-              entries={traceEntries}
-              cursor={traceCursorClamped}
-              filter={traceFilter}
-            />
-          </Box>
-        )}
-        {searchOpen && <TranscriptSearchBar query={searchQuery} cursorOffset={searchCursor} count={searchCount} current={searchCurrent} />}
         <GoalTodoPanel channel={channel} />
         {approvalSnapshot !== null ? (
           <ApprovalPanel
@@ -1752,6 +1663,104 @@ export function Chat({
           selectionActive={selectionActive}
           helpOpen={helpOpen}
         />
+        {/* 瞬态面板浮层：absolute + bottom:'100%' 钉在本 chrome Box 顶边，向上
+            覆盖转录尾部行，自身零布局高度。in-flow 挂载会让帧高随面板开关涨落，
+            把帧顶行滚进 scrollback 并在关闭重绘时二次写入（每切一次 /model 多
+            一份启动画的根因）。maxHeight 预留 prompt/statusline 行，防短会话
+            高列表探出帧顶。 */}
+        <OverlayAbove maxHeight={Math.max(terminalRows - 8, 8)}>
+          {thinkingOpen && (
+            <ThinkingToggle
+              currentValue={thinkingVisible}
+              focusIndex={thinkingFocus}
+              confirmationPending={thinkingConfirm}
+            />
+          )}
+          {resumePickerOpen && resumeSessions.length > 0 && (
+            <Box flexDirection="column" marginTop={1}>
+              <ResumePicker
+                sessions={resumeSessions}
+                focusIndex={resumeIndex}
+                currentSessionId={channel.agentId}
+                mode={resumeMode}
+                renameText={resumeRenameText}
+              />
+            </Box>
+          )}
+          {modelPickerOpen && (
+            <Box flexDirection="column" marginTop={1}>
+              {models.length === 0 ? (
+                <ModelPickerLoading />
+              ) : (
+                <ModelPicker
+                  models={models}
+                  focusIndex={modelIndex}
+                  currentModel={`${channel.provider}/${channel.model}`}
+                />
+              )}
+            </Box>
+          )}
+          {activityPickerOpen && (
+            <Box flexDirection="column" marginTop={1}>
+              <ActivityPicker
+                focusIndex={activityIndex}
+                currentPreset={channel.activityFrames}
+              />
+            </Box>
+          )}
+          {effortSliderOpen && effortOptions.length > 1 && (
+            <Box flexDirection="column" marginTop={1}>
+              <EffortSlider
+                options={effortOptions}
+                focusIndex={effortIndex}
+                currentId={channel.reasoningEffort}
+              />
+            </Box>
+          )}
+          {presetPickerOpen && presetOptions.length > 0 && (
+            <Box flexDirection="column" marginTop={1}>
+              <PresetPicker
+                presets={presetOptions}
+                focusIndex={presetIndex}
+                currentPreset={channel.agentPreset}
+              />
+            </Box>
+          )}
+          {themePickerOpen && (
+            <Box flexDirection="column" marginTop={1}>
+              <ThemePicker focusIndex={themeIndex} currentTheme={themeName} />
+            </Box>
+          )}
+          {historyOpen && (
+            <Box flexDirection="column" marginTop={1}>
+              <HistorySearchDialog
+                query={historyQuery}
+                cursorOffset={historyCursor}
+                matches={historyMatches}
+                focusIndex={historyFocus}
+              />
+            </Box>
+          )}
+          {rewindOpen && (
+            <Box flexDirection="column" marginTop={1}>
+              <RewindPicker
+                rows={rewindRows}
+                focusIndex={rewindIndex}
+                confirmRow={rewindConfirm}
+              />
+            </Box>
+          )}
+          {traceOpen && (
+            <Box flexDirection="column" marginTop={1}>
+              <TraceView
+                entries={traceEntries}
+                cursor={traceCursorClamped}
+                filter={traceFilter}
+              />
+            </Box>
+          )}
+          {searchOpen && <TranscriptSearchBar query={searchQuery} cursorOffset={searchCursor} count={searchCount} current={searchCurrent} />}
+        </OverlayAbove>
       </Box>
     </Box>
   )
